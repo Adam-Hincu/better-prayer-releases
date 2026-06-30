@@ -48,6 +48,24 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Prepare release notes
+        id: notes
+        shell: bash
+        run: |
+          VERSION="${{ inputs.tag }}"
+          VERSION="${VERSION#v}"
+          NOTES="releases/${VERSION}.md"
+          if [ -f "$NOTES" ]; then
+            BODY=$(cat "$NOTES")
+          else
+            BODY="See the assets below to download and install this version."
+          fi
+          {
+            echo 'body<<EOF'
+            echo "$BODY"
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
       # tauri-action creates the GitHub release in THIS repo (the public one)
       # because GITHUB_TOKEN/GITHUB_REPOSITORY resolve to it. It signs the
       # artifacts and generates `latest.json` with public download URLs.
@@ -60,7 +78,7 @@ jobs:
         with:
           tagName: ${{ inputs.tag }}
           releaseName: "Better Prayer ${{ inputs.tag }}"
-          releaseBody: "See the assets below to download and install this version."
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: true
           prerelease: false
           includeUpdaterJson: true
