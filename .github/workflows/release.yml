@@ -1,0 +1,66 @@
+name: Release
+
+# Builds Better Prayer from the PRIVATE source repo and publishes a signed,
+# auto-update-ready release here (in this PUBLIC repo). The app's in-app updater
+# points at this repo's `latest.json`, so the source code can stay private while
+# the compiled installers are publicly downloadable.
+#
+# Trigger this manually from the Actions tab ("Run workflow") and pass the
+# version tag you want to build. That tag must already exist in the private
+# source repo (e.g. push `v0.2.0` there first).
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version tag to build (must already exist in the private source repo), e.g. v0.2.0"
+        required: true
+        type: string
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    runs-on: windows-latest
+    steps:
+      # Pull the private source at the requested tag using a PAT with read
+      # access to the private repo's contents (stored as SOURCE_REPO_TOKEN).
+      - name: Checkout private source
+        uses: actions/checkout@v4
+        with:
+          repository: Adam-Hincu/better-prayer
+          ref: ${{ inputs.tag }}
+          token: ${{ secrets.SOURCE_REPO_TOKEN }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # tauri-action creates the GitHub release in THIS repo (the public one)
+      # because GITHUB_TOKEN/GITHUB_REPOSITORY resolve to it. It signs the
+      # artifacts and generates `latest.json` with public download URLs.
+      - name: Build and publish release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ inputs.tag }}
+          releaseName: "Better Prayer ${{ inputs.tag }}"
+          releaseBody: "See the assets below to download and install this version."
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: true

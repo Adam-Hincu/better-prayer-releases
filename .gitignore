@@ -1,0 +1,9 @@
+# This repo intentionally contains no source or build output.
+# Release artifacts are uploaded to GitHub Releases, not committed here.
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
